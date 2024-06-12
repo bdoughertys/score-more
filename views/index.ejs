@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Score More</title>
+  <link rel="stylesheet" href="../styles.css">
+  </head>
+<body>
+  <div class="wrapper">
+    <h1 class="heading1">Welcome to Score More!</h1>
+    <p class="introduction">Create or join a room below. Each person can keep track of their score individually!</p>
+    <form id="home-form">
+      <label for="room-code">Room Code <sup>(Leave blank to create a room)</sup></label><br>
+      <input id="room-code" class="input-field" type="text" placeholder="Room Code" autocomplete="off"><br><br>
+      <button id="go" class="button" type="submit">Let's Go!</button>
+
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('home-form')
+    const roomCode = document.getElementById('room-code')
+    const go = document.getElementById('go')
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault()
+      const roomCodeValue = roomCode.value
+      if (roomCodeValue === '') {
+        window.location.href = `/create-room`
+      } else {
+        window.location.href = `/room/${roomCodeValue}`
+      }
+    })
+  </script>
+</body>
+</html>
