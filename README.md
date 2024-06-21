@@ -15,9 +15,9 @@ Handles users with socket.io and redis
 -v1.0
 Initial version that just has a live score board. The home page lets you create or join a room and has each player appear on the board with their total score. Players are ordered by the order in which they join.
 
--Wishlist to add
-Sort players by high or low score.
-Be able to change name from Player-n to a custom name.
+-Wishlist to add\
+Sort players by high or low score.\
+Be able to change name from Player-(n) to a custom name.\
 View other players score history.
 
 Feel free to contact me.
