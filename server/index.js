@@ -3,6 +3,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const Redis = require('redis');
 const redisClient = Redis.createClient({url: process.env.REDISCLOUD_URL, socket: {tls: true, rejectUnauthorized: false}})
+const cors = require('cors')
 const bodyParser = require('body-parser');
 
 const app = express();
