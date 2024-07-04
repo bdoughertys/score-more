@@ -4,32 +4,52 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Score More</title>
-  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="/css/styles.css">
   </head>
 <body>
   <div class="wrapper">
-    <h1 class="heading1">Welcome to Score More!</h1>
-    <p class="introduction">Create or join a room below. Each person can keep track of their score individually!</p>
+    <h1 class="heading1">Score More!</h1>
+    <h2 class="tagline">No pen, no paper,<br>no scorekeeper!</h2>
+    <p class="introduction">Enter your name and join in on the easiest way to keep score in a group!</p>
     <form id="home-form">
-      <label for="room-code">Room Code <sup>(Leave blank to create a room)</sup></label><br>
-      <input id="room-code" class="input-field" type="text" placeholder="Room Code" autocomplete="off"><br><br>
+      <label for="player-name">Name*</label><br>
+      <input type="text" id="player-name" name="playerName" class="input-field" required autocomplete="off"><br>
+      <label for="room-code">Room Code</label><br>
+      <input id="room-code" name="roomCode" class="input-field" type="text" placeholder="Leave blank create" autocomplete="off"><br><br>
       <button id="go" class="button" type="submit">Let's Go!</button>
-
     </form>
   </div>
 
   <script>
     const form = document.getElementById('home-form')
     const roomCode = document.getElementById('room-code')
-    const go = document.getElementById('go')
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async function(e) {
       e.preventDefault()
-      const roomCodeValue = roomCode.value
-      if (roomCodeValue === '') {
-        window.location.href = `/create-room`
-      } else {
-        window.location.href = `/room/${roomCodeValue}`
+      const target = e.target
+      const formData = new FormData(target)
+      const data = {}
+
+      formData.forEach((value, key) => {
+        data[key] = value
+      })
+
+      try {
+        const response = await fetch('/add-player', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        })
+        if (response.ok) {
+          const result = await response.json();
+          window.location.href = `/room/${result.roomCode}/${result.playerName}`
+        } else {
+          window.location.href = '/error'
+        }
+      } catch (error) {
+        console.error(error)
       }
     })
   </script>

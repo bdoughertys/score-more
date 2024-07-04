@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Score More</title>
-  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="/css/styles.css">
   </head>
 <body>
   <div class="wrapper">
 
     <div id="title">
       <h1 id="game-title">Score More</h1>
-      <p id="code">Room Code: <%= room %></p>
+      <p id="code"></p>
       </div>
 
       <div id="display">
@@ -24,86 +24,106 @@
         </div>
       </div>
 
+      <div id="dropdowns">
+        <div id="history-dropdown" class="dropdown">
+          <label for="history-select">View scores of:</label><br>
+          <select name="history-select" id="history-select">
+
+          </select>
+        </div>
+
+        <div id="sort-dropdown" class="dropdown">
+            <label for="score-sort">Sort Scores by:</label><br>
+            <select name="score-sort" id="score-sort">
+              <option value="descending" class="selection">High to Low</option>
+              <option value="ascending" class="selection">Low to High</option>
+            </select>
+          </div>
+      </div>
+
       <form id="score-form">
-        <label for="input">Score:</label>
-        <input type="number" class="input-field" id="input" autocomplete="off">
-        <button type="submit" class="button">Tally</button><br>
-        <p>Type how much to increase or decrease your score by</p>
+        <input type="number" class="input-field" id="input" autocomplete="off" required>
+        <button type="submit" class="button">Score</button><br>
         </form>
-      <p id="identifier">You are <span id="playerName"></span></p>
 
 
       <!-- START JAVASCRIPT -->
       <!--        -->
       <script src="/socket.io/socket.io.js"></script>
       <script>
-        // gets the room code
-        const room = String(window.location.pathname).slice(-4)
-        const socket = io( {
-          reconnection: true,
-          reconnectionAttempts: 3,
-          reconnectionDelay: 10000,
-          reconnectionDelayMax: 10000,
-        });
+        const form = document.getElementById('score-form')
+        const scoreBoard = document.getElementById('players')
+        const scoreSort = document.getElementById('score-sort')
+        const playerName = window.location.pathname.split('/')[3]
+        const roomCode = window.location.pathname.split('/')[2]
+        const historySelect = document.getElementById('history-select')
+        const scoreHistory = document.getElementById('scores')
+        document.getElementById('code').innerText = `Room Code: ${roomCode}`
 
-        const scoreForm = document.getElementById('score-form')
-        const input = document.getElementById('input')
-        const name = document.getElementById('playerName')
-
-        let round = 1
-        let scores = [0]
-        let playerName = ''
-        const sum = scores.reduce((total, score) => total + parseInt(score), 0);
-
-        scoreForm.addEventListener('submit', (e) => {
-          const name = playerName
-          e.preventDefault()
-          const score = input.value
-          if (score === '') return
-          handleInput(score)
-          socket.emit('score', room, name, score)
-          input.value = ''
-        })
-
-        // when a socket connects, it joins the room and gets the players
-        socket.on('connect', () => {
-              socket.emit('join', room);
-              socket.emit('get-players', room);
-        });
-
-        socket.on('player-set', (player) => {
-          playerName = player
-          name.innerHTML = player
-        })
-
-        // when the server responds to a player connecting to a room it populates the player list
-        socket.on('get-players', (players) => {
-          const playerIds = Object.keys(players)
-          const playerScores = Object.values(players)
-          document.getElementById('players').innerHTML = '<p class="section-title">Players</p>'
-          for (let i = 0; i < playerIds.length; i++) {
-            document.getElementById('players').insertAdjacentHTML('beforeend', `<div>${playerIds[i]}: ${playerScores[i]}</div>`)
+        socket = io({
+          extraHeaders: {
+            'playerName': playerName,
+            'roomCode': roomCode
           }
-
         })
 
-        // when the server sends a message, it displays it
-        socket.on('receive', (message) => {
-          displayMessage(message)
+        let roster = []
+        let selectedPlayer = playerName
+
+        socket.on('connect', () => {
+          socket.emit('join-room', roomCode)
         })
 
-        socket.on('change', () => {
-          socket.emit('get-players', room)
+        socket.on('update-board', (response) => {
+          let newRoster = []
+          let scores = []
+          let sortBy = scoreSort.value
+          scoreBoard.innerHTML = '<p class="section-title">Players</p>'
+          response.forEach((player) => {
+            newRoster.push(player.value)
+            scores.push(player.score)
+          })
+          if (sortBy === "descending") {
+            newRoster.reverse()
+            scores.reverse()
+          }
+          for (let i=0; i < scores.length; i++) {
+            scoreBoard.insertAdjacentHTML('beforeend', `<p>${newRoster[i]}: ${scores[i]}</p>`)
+          }
+          if (roster.length !== newRoster.length) {
+            historySelect.innerHTML = ''
+            roster = newRoster
+            roster.forEach((name) => {
+              historySelect.insertAdjacentHTML('beforeend', `<option value="${name}" class="selection">${name}</option>`)
+            })
+          }
+          socket.emit('get-history', roomCode, selectedPlayer)
         })
 
-        // when the player inputs a score, it adds it to the score history
-        function handleInput(score) {
-          document.getElementById('scores').insertAdjacentHTML('beforeend', `<div>${round}: ${score}</div>`);
-          scores.push(score)
-          round++
-          // socket.emit('score', room)
-        }
+        socket.on('send-history', (history) => {
+          let i = 1
+          scoreHistory.innerHTML = `<p class="section-title">${selectedPlayer}'s Score History</p>`
+          history.forEach((entry) => {
+            scoreHistory.insertAdjacentHTML('beforeend', `<p>Round ${i} :[ ${entry} ]</p>`)
+            i++
+          })
+        })
 
+        form.addEventListener('submit', (e) => {
+          e.preventDefault()
+          const inputValue = document.getElementById('input').value
+          socket.emit('update-score', roomCode, playerName, inputValue)
+          document.getElementById('input').value = ''
+        })
+
+        historySelect.addEventListener('change', (e) => {
+          selectedPlayer = e.target.value
+          socket.emit('get-history', roomCode, selectedPlayer)
+        })
+
+        scoreSort.addEventListener('change', (e) => {
+          socket.emit('update-order', roomCode)
+        })
       </script>
       <!--        -->
   </div>
