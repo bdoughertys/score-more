@@ -3,125 +3,122 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const Redis = require('redis');
 const redisClient = Redis.createClient();
+const cors = require('cors');
+const bodyParser = require('body-parser');
 
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   connectionStateRecovery: {
-    maxDisconnectionDuration: 2 * 60 * 1000,
+    maxDisconnectionDuration: 1000*60,
     skipMiddlewares: true
   }
 })
 
+// redis initialization
 redisClient.connect()
-
 redisClient.on('connect', () => {
   console.log('Redis client connected');
 })
+redisClient.on('error', (err) => {
+  console.log('Redis error:', err)
+})
 
-// available letters for room generation
-const LETTERS = ["B", "C", "D", "F", "G", "H", "J", "K", "L", "M", "N", "P", "Q", "R", "S", "T", "V", "W", "X", "Y", "Z"];
-
-// an array of the active room codes.
-let activeRooms = [];
-
+app.use (cors());
+app.use(bodyParser.json());
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
 
+// available letters for room generation
+const LETTERS = ["B", "C", "D", "F", "G", "H", "J", "K", "L", "M", "N", "P", "Q", "R", "S", "T", "V", "W", "X", "Y", "Z"];
+// an array of the active room codes.
+let activeRooms = [];
 
 app.get('/', (req, res) => {
   res.render('index');
 });
 
-// creates a new room and redirects the user to the room
-app.get('/create-room', generateRoom, (req, res) => {
-  res.redirect(`/room/${req.params.room}`);
+app.get('/error', (req, res) => {
+  res.render('error');
 });
 
-// renders the room if it exists, otherwise renders an error page
-app.get("/room/:room", (req, res) => {
-  if (activeRooms.includes(req.params.room)) {
-    res.render('room', {room: req.params.room});
-  } else {
-    res.render("error");
+app.post('/add-player', (req, res) => {
+  let playerName = req.body.playerName
+  let roomCode = req.body.roomCode
+  if (roomCode === '') {
+    roomCode = generateRoom()
   }
-});
+  if (activeRooms.includes(roomCode)) {
+    redisClient.zAdd(roomCode, [{score: 0, value: playerName}], (err, response) => {
+      if (err) {
+        console.log(err)
+        return res.status(500).send("Server Error. Please try again.")
+      }
+      res.json
+    })
+  }
+  redisClient.expire(roomCode, 7200)
+  res.json({ playerName, roomCode })
+})
+
+// renders the room if it exists, otherwise renders an error page
+app.get("/room/:room/:name", (req, res) => {
+  res.render('room');
+  });
 
 
 io.on('connection', socket => {
-    // joins the socket to the room when it connects
-  socket.on('join', (room) => {
-    socket.join(room)
-    let player = setPlayer(room)
-    player.then((player) => {
-      socket.emit('player-set', player)
-    })
-    socket.to(room).emit('change')
-
-  })
-
-  // sends an array of all the players in the room
-  socket.on('get-players', (room) => {
-    getPlayers(room).then((players) => {
-      socket.emit('get-players', players)
+  socket.on('join-room', (roomCode) => {
+    socket.join(roomCode)
+    redisClient.zRangeWithScores(roomCode, 0, -1).then((players) => {
+      io.to(roomCode).emit('update-board', players)
     })
   })
 
-  // sends the received message to the room
-  socket.on('score', (room, player, score) => {
-    redisClient.hIncrBy(room + 'scores', player, score)
-    io.to(room).emit('change')
+  socket.on('update-score', (roomCode, playerName, score) => {
+    redisClient.rPush(roomCode + playerName, score)
+    redisClient.zIncrBy(roomCode, score, playerName)
+    redisClient.zRangeWithScores(roomCode, 0, -1).then((players) => {
+      io.to(roomCode).emit('update-board', players)
+    })
+    redisClient.expire(roomCode + playerName, 7200)
   })
 
-  // removes the room from the activeRooms array when the last player leaves
-  socket.on('disconnect', () => {
-    let rooms = io.sockets.adapter.rooms
-    activeRooms.forEach(room => {
-      if (!rooms.has(room)) {
-        redisClient.del(room)
-        redisClient.del(room + 'scores')
-        activeRooms.splice(activeRooms.indexOf(room), 1);
-      } else {
-        io.to(room).emit('change')
-      }
+  socket.on('get-history', (roomCode, playerName) => {
+    redisClient.lRange(roomCode + playerName, 0, -1).then((history) => {
+      socket.emit('send-history', history)
+    })
+  })
+
+  socket.on('update-order', (roomCode) => {
+    redisClient.zRangeWithScores(roomCode, 0, -1).then((players) => {
+      io.to(roomCode).emit('update-board', players)
+    })
+  })
+
+  socket.on('disconnecting', () => {
+    socket.handshake.headers.playername || socket.handshake.headers.roomcode
+    player = socket.handshake.headers.playername
+    room = socket.handshake.headers.roomcode
+    redisClient.zRem(room, player)
+    redisClient.del(room + player)
+    redisClient.zRangeWithScores(room, 0, -1).then((players) => {
+      io.to(room).emit('update-board', players)
     })
   })
 })
 
 // generates a random 4 letter room code
-  function generateRoom(req, res, next) {
-    let room = "";
-    for (let i = 0; i < 4; i++) {
-      room += LETTERS[Math.floor(Math.random() * LETTERS.length)];
-    }
-    redisClient.hSet(room, "players", 0)
-    activeRooms.push(room);
-    req.params.room = room;
-    next();
+function generateRoom() {
+  let room = "";
+  for (let i = 0; i < 4; i++) {
+    room += LETTERS[Math.floor(Math.random() * LETTERS.length)];
   }
+  activeRooms.push(room);
+  return room;
+}
 
-  async function setPlayer(room) {
-    redisClient.hIncrBy(room, "players", 1)
-    let playerCount = await redisClient.hGet(room, "players")
-    redisClient.hSet(room + 'scores', `Player-${playerCount}`, 0)
-    let player = `Player-${playerCount}`
-    return player
-  }
-
-  async function getPlayers(room) {
-    let playerScores = await redisClient.hGetAll(room + 'scores')
-    return playerScores
-  }
-
-  // function changeScores(room, player, score) {
-  //   let key = room + 'scores'
-  //   let field = player
-  //   let value = parseInt(score)
-  //   redisClient.hIncrBy(key, field, value)
-  //   return
-  // }
-
-  // starts the server on port 3000
-  server.listen(3000, () => {
-    console.log('Server is running on port 3000');
-  });
+// starts the server on port 3000
+server.listen(3000, () => {
+  console.log('Server is running on port 3000');
+});
