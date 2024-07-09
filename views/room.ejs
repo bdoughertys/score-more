@@ -54,8 +54,8 @@
         const form = document.getElementById('score-form')
         const scoreBoard = document.getElementById('players')
         const scoreSort = document.getElementById('score-sort')
-        const playerName = window.location.pathname.split('/')[3]
-        const roomCode = window.location.pathname.split('/')[2]
+        const playerName = decodeURI(window.location.pathname.split('/')[3])
+        const roomCode = decodeURI(window.location.pathname.split('/')[2])
         const historySelect = document.getElementById('history-select')
         const scoreHistory = document.getElementById('scores')
         document.getElementById('code').innerText = `Room Code: ${roomCode}`

@@ -5,6 +5,7 @@ const Redis = require('redis');
 const redisClient = Redis.createClient({url: process.env.REDISCLOUD_URL, tls: {rejectUnauthorized: false}})
 const cors = require('cors')
 const bodyParser = require('body-parser');
+const { render } = require('ejs');
 
 const app = express();
 const server = createServer(app);
@@ -44,10 +45,14 @@ app.get('/error', (req, res) => {
 
 app.post('/add-player', (req, res) => {
   let playerName = req.body.playerName
-  let roomCode = req.body.roomCode
-  if (roomCode === '') {
+  let roomCode = ""
+  // checks for a room code and generates one if needed
+  if (req.body.roomCode === '') {
     roomCode = generateRoom()
+  } else {
+    roomCode = req.body.roomCode.toUpperCase()
   }
+  // checks for the room in active rooms, shows error page if room not available
   if (activeRooms.includes(roomCode)) {
     redisClient.zAdd(roomCode, [{score: 0, value: playerName}], (err, response) => {
       if (err) {
@@ -56,12 +61,15 @@ app.post('/add-player', (req, res) => {
       }
       res.json
     })
+  } else {
+    // renders the error page if the room is not available
+    app.render("error")
   }
+  // sets expire time on rooms
   redisClient.expire(roomCode, 7200)
   res.json({ playerName, roomCode })
 })
 
-// renders the room if it exists, otherwise renders an error page
 app.get("/room/:room/:name", (req, res) => {
   res.render('room');
   });
