@@ -51,15 +51,23 @@
       <!--        -->
       <script src="/socket.io/socket.io.js"></script>
       <script>
+        // Constants for the page divs, player name and room code.
         const form = document.getElementById('score-form')
         const scoreBoard = document.getElementById('players')
         const scoreSort = document.getElementById('score-sort')
+        // decodes the roomcode and player name from the url. Just in case of special characters
         const playerName = decodeURI(window.location.pathname.split('/')[3])
         const roomCode = decodeURI(window.location.pathname.split('/')[2])
         const historySelect = document.getElementById('history-select')
         const scoreHistory = document.getElementById('scores')
+        // Puts the room code at the top of the room page.
         document.getElementById('code').innerText = `Room Code: ${roomCode}`
 
+        // TODO: Maybe we can refactor some of our events to not have to pass the
+        // the variables. We send the player name and roomcode in the headers. Seems like extra data, although small, maybe a scaling issue.
+
+        // Instantiates the socket with socket.io with the playername and roomcode headers
+        // Currently only using the handshake headers in the disconnecting event.
         socket = io({
           extraHeaders: {
             'playerName': playerName,
@@ -67,13 +75,20 @@
           }
         })
 
+        // the roster that is used for the history select.
         let roster = []
+        // Sets the client as the default player to get score history for.
         let selectedPlayer = playerName
 
+        // On connecting the client emits join-room which joins them too the socket.io
+        // room and gets the Redis sorted set for that room.
         socket.on('connect', () => {
           socket.emit('join-room', roomCode)
         })
 
+        // When the server sends an updated sorted list we parse and store the roster
+        // and scores. Run a for loop on the score totals and append them to the
+        // scoreboard.
         socket.on('update-board', (response) => {
           let newRoster = []
           let scores = []
@@ -83,13 +98,18 @@
             newRoster.push(player.value)
             scores.push(player.score)
           })
+          // Then the "sort by" value is checked and reversed if needed,
+          // the score are sent in ascending order by default.
           if (sortBy === "descending") {
             newRoster.reverse()
             scores.reverse()
           }
+          //  Run a for loop on the score totals and append them to the score board.
           for (let i=0; i < scores.length; i++) {
             scoreBoard.insertAdjacentHTML('beforeend', `<p>${newRoster[i]}: ${scores[i]}</p>`)
           }
+          // If the roster length has changed we update the history selection dropdown
+          // with the new list of player names
           if (roster.length !== newRoster.length) {
             historySelect.innerHTML = ''
             roster = newRoster
@@ -97,9 +117,12 @@
               historySelect.insertAdjacentHTML('beforeend', `<option value="${name}" class="selection">${name}</option>`)
             })
           }
+          // Sends a request for the Redis list of scores for a given player name
           socket.emit('get-history', roomCode, selectedPlayer)
         })
 
+        // When the server responds with a list of scores for a player the clients score
+        // history section is populated with the scores in order of entry.
         socket.on('send-history', (history) => {
           let i = 1
           scoreHistory.innerHTML = `<p class="section-title">${selectedPlayer}'s Score History</p>`
@@ -109,6 +132,9 @@
           })
         })
 
+        // Emits the update score with the value entered. The server uses the player name
+        // roomcode and value to update the list and sorted set for that player. Afterward
+        // the server emits the update board action and resets the expiry time for the set
         form.addEventListener('submit', (e) => {
           e.preventDefault()
           const inputValue = document.getElementById('input').value
@@ -116,11 +142,18 @@
           document.getElementById('input').value = ''
         })
 
+        // When the client changes the value of the history select dropdown,
+        // the the server emits a "send-history" event that sends the list of scores
+        // for that player name.
         historySelect.addEventListener('change', (e) => {
           selectedPlayer = e.target.value
           socket.emit('get-history', roomCode, selectedPlayer)
         })
 
+        // Sends an update order event to the server that gets the sorted set
+        // of that room and the server emits an update board event.
+        // TODO: Maybe this event should change on server side to only emit to the
+        // socket that sent the event?
         scoreSort.addEventListener('change', (e) => {
           socket.emit('update-order', roomCode)
         })
