@@ -41,10 +41,12 @@
           </div>
       </div>
 
+      <!-- Some mobile digit keyboards do not have a "-" apparently, seperate buttons for add and subtract -->
       <form id="score-form">
         <input type="number" class="input-field" id="input" autocomplete="off" required>
-        <button type="submit" class="button">Score</button><br>
-        </form>
+        <button type="submit" id="add" class="button">Add</button>
+        <button type="submit" id="subtract" class="button">Subtract</button><br>
+      </form>
 
 
       <!-- START JAVASCRIPT -->
@@ -138,8 +140,13 @@
         form.addEventListener('submit', (e) => {
           e.preventDefault()
           const inputValue = document.getElementById('input').value
-          socket.emit('update-score', roomCode, playerName, inputValue)
-          document.getElementById('input').value = ''
+          if (e.submitter.id === "add") {
+            socket.emit('update-score', roomCode, playerName, inputValue)
+            document.getElementById('input').value = ''
+          } else {
+            socket.emit('update-score', roomCode, playerName, ("-" + inputValue))
+            document.getElementById('input').value = ''
+          }
         })
 
         // When the client changes the value of the history select dropdown,

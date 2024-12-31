@@ -139,16 +139,17 @@ io.on('connection', socket => {
   // TODO: Some issues on mobile timing out and being seen as disconnecting when the phone
   // sleeps. Is there a better way to handle disconnects? Or should we just not handle them
   // and let them time out, and not update boards on a player leaving.
-  socket.on('disconnecting', () => {
-    socket.handshake.headers.playername || socket.handshake.headers.roomcode
-    player = socket.handshake.headers.playername
-    room = socket.handshake.headers.roomcode
-    redisClient.zRem(room, player)
-    redisClient.del(room + player)
-    redisClient.zRangeWithScores(room, 0, -1).then((players) => {
-      io.to(room).emit('update-board', players)
-    })
-  })
+  // 31.12.24 Commented out to stop board update issues on phone sleeping
+  // socket.on('disconnecting', () => {
+  //   socket.handshake.headers.playername || socket.handshake.headers.roomcode
+  //   player = socket.handshake.headers.playername
+  //   room = socket.handshake.headers.roomcode
+  //   redisClient.zRem(room, player)
+  //   redisClient.del(room + player)
+  //   redisClient.zRangeWithScores(room, 0, -1).then((players) => {
+  //     io.to(room).emit('update-board', players)
+  //   })
+  // })
 })
 
 // generates a random 4 letter room code. LETTERS has vowels excluded to avoid
