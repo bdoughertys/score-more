@@ -46,3 +46,9 @@ Updated submissions to have an add and subtract button for compatibility reasons
 Removed disconnect logic from server because of issues with phones sleeping being seen as a disconnect event.
 
 ---
+
+### 6 June 2025
+
+Added in app keyboard, and ablity to tap player names to view history.
+
+---

@@ -117,8 +117,9 @@ io.on('connection', socket => {
   // At the end of a update board event on the client side, there is then a request
   // for the history of the currently selected player.
   socket.on('get-history', (roomCode, playerName) => {
+    let name = playerName
     redisClient.lRange(roomCode + playerName, 0, -1).then((history) => {
-      socket.emit('send-history', history)
+      socket.emit('send-history', history, name)
     })
   })
 
