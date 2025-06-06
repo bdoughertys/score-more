@@ -21,6 +21,7 @@
 
         <div id="players">
           <p class="section-title">Players</p>
+          <div id='playerDivs'></div>
         </div>
       </div>
 
@@ -33,7 +34,7 @@
         </div>
 
         <div id="sort-dropdown" class="dropdown">
-            <label for="score-sort">Sort Scores by:</label><br>
+            <label for="score-sort">Sort by:</label><br>
             <select name="score-sort" id="score-sort">
               <option value="descending" class="selection">High to Low</option>
               <option value="ascending" class="selection">Low to High</option>
@@ -41,11 +42,17 @@
           </div>
       </div>
 
-      <!-- Some mobile digit keyboards do not have a "-" apparently, seperate buttons for add and subtract -->
       <form id="score-form">
-        <input type="number" class="input-field" id="input" autocomplete="off" required>
-        <button type="submit" id="add" class="button">Add</button>
-        <button type="submit" id="subtract" class="button">Subtract</button><br>
+        <div id="input">Type your score</div>
+        <div id="buttons">
+          <div class="digits">
+            <div><button type="submit" value="1" class="key">1</button><button type="submit" value="2" class="key">2</button><button type="submit" value="3" class="key">3</button></div>
+            <div><button type="submit" value="4" class="key">4</button><button type="submit" value="5" class="key">5</button><button type="submit" value="6" class="key">6</button></div>
+            <div><button type="submit" value="7" class="key">7</button><button type="submit" value="8" class="key">8</button><button type="submit" value="9" class="key">9</button></div>
+            <div><button type="submit" value="back" class="key">&lt</button><button type="submit" value="0" class="key">0</button><button type="submit" value="-" class="key">-</button></div>
+          </div>
+          <button type="submit" id="submit" class="button">Add</button>
+        </div>
       </form>
 
 
@@ -56,6 +63,7 @@
         // Constants for the page divs, player name and room code.
         const form = document.getElementById('score-form')
         const scoreBoard = document.getElementById('players')
+        const playerDivs = document.getElementById('playerDivs')
         const scoreSort = document.getElementById('score-sort')
         // decodes the roomcode and player name from the url. Just in case of special characters
         const playerName = decodeURI(window.location.pathname.split('/')[3])
@@ -95,7 +103,7 @@
           let newRoster = []
           let scores = []
           let sortBy = scoreSort.value
-          scoreBoard.innerHTML = '<p class="section-title">Players</p>'
+          playerDivs.innerHTML= ""
           response.forEach((player) => {
             newRoster.push(player.value)
             scores.push(player.score)
@@ -108,8 +116,9 @@
           }
           //  Run a for loop on the score totals and append them to the score board.
           for (let i=0; i < scores.length; i++) {
-            scoreBoard.insertAdjacentHTML('beforeend', `<p>${newRoster[i]}: ${scores[i]}</p>`)
+            playerDivs.insertAdjacentHTML('beforeend', `<div class="playerDiv" id=${newRoster[i]}><p>${newRoster[i]}: ${scores[i]}</p><div>`)
           }
+
           // If the roster length has changed we update the history selection dropdown
           // with the new list of player names
           if (roster.length !== newRoster.length) {
@@ -119,19 +128,22 @@
               historySelect.insertAdjacentHTML('beforeend', `<option value="${name}" class="selection">${name}</option>`)
             })
           }
+
           // Sends a request for the Redis list of scores for a given player name
           socket.emit('get-history', roomCode, selectedPlayer)
+          addEventstoPlayers()
         })
 
         // When the server responds with a list of scores for a player the clients score
         // history section is populated with the scores in order of entry.
-        socket.on('send-history', (history) => {
+        socket.on('send-history', (history, name) => {
           let i = 1
-          scoreHistory.innerHTML = `<p class="section-title">${selectedPlayer}'s Score History</p>`
+          scoreHistory.innerHTML = `<p class="section-title">${name}'s Score History</p>`
           history.forEach((entry) => {
             scoreHistory.insertAdjacentHTML('beforeend', `<p>Round ${i} :[ ${entry} ]</p>`)
             i++
           })
+          historySelect.value = name
         })
 
         // Emits the update score with the value entered. The server uses the player name
@@ -139,23 +151,47 @@
         // the server emits the update board action and resets the expiry time for the set
         form.addEventListener('submit', (e) => {
           e.preventDefault()
-          const inputValue = document.getElementById('input').value
-          if (e.submitter.id === "add") {
-            socket.emit('update-score', roomCode, playerName, inputValue)
-            document.getElementById('input').value = ''
+          const input = document.getElementById("input")
+          if (e.submitter.id === "submit") {
+            const inputValue = input.innerHTML
+            if (!validInput(inputValue)) {
+              input.innerHTML = "Enter valid score"
+              return
+            } else {
+              socket.emit('update-score', roomCode, playerName, inputValue)
+              input.innerHTML = "Type your score"
+            }
+          } else if(e.submitter.value === "back") {
+            let values = input.innerHTML.split('')
+            values.pop()
+            input.innerHTML = values.length === 0 ? "Type your score" : values.join('')
           } else {
-            socket.emit('update-score', roomCode, playerName, ("-" + inputValue))
-            document.getElementById('input').value = ''
+            input.innerHTML === "Type your score" || input.innerHTML === "Enter valid score" ? input.innerHTML = e.submitter.value : input.innerHTML += e.submitter.value
           }
         })
+
+        // Checks to make sure a valid score  has been submitted
+        function validInput(inputValue) {
+          let values = inputValue.split('')
+          values = values.map((e) => parseInt(e))
+          if (values.includes(NaN, 1) || inputValue === "-" ) {
+            return false
+          } else {
+            return true
+          }
+        }
 
         // When the client changes the value of the history select dropdown,
         // the the server emits a "send-history" event that sends the list of scores
         // for that player name.
         historySelect.addEventListener('change', (e) => {
-          selectedPlayer = e.target.value
-          socket.emit('get-history', roomCode, selectedPlayer)
+          changeHistory(e.target.value)
         })
+
+        // Changes the history viewed by the player
+        function changeHistory(selectedPlayer) {
+          socket.emit('get-history', roomCode, selectedPlayer)
+        }
 
         // Sends an update order event to the server that gets the sorted set
         // of that room and the server emits an update board event.
@@ -164,6 +200,17 @@
         scoreSort.addEventListener('change', (e) => {
           socket.emit('update-order', roomCode)
         })
+
+        // Adds the click event on player divs to be able to change score history
+        // by touching/clicking the player name
+        function addEventstoPlayers() {
+          let elements = playerDivs.querySelectorAll('.playerDiv')
+          elements.forEach((element) => {
+            element.addEventListener("click", (e) => {
+              changeHistory(element.id)
+          })
+        })
+      }
       </script>
       <!--        -->
   </div>
