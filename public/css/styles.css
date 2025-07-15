@@ -1,15 +1,19 @@
 body {
-  overflow: hidden;
+  overflow: hide;
   background-color: #7FD1B9;
   margin: 0;
   padding: 0;
-}
-
-.wrapper {
   width: 100vw;
   width: 100svw;
   height: 100vh;
   height: 100svh;
+}
+
+.wrapper {
+  width: 95%;
+  width: 95%;
+  height: 95%;
+  height: 95%;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -18,7 +22,7 @@ body {
 
 #title {
   background-color: #E56399;
-  width: 80vw;
+  width: 80%;
   text-align: center;
   border: 2px solid black;
   color: white;
@@ -41,6 +45,8 @@ body {
 }
 
 #display {
+  height: 100%;
+  width: 80%;
   display: flex;
   justify-content: space-around;
 }
@@ -48,8 +54,8 @@ body {
 #scores, #players {
   background-color: white;
   text-align: center;
-  height: 60vh;
-  width: 40vw;
+  height: 100%;
+  width: 100%;
   border: 1px solid black;
   color: black;
   overflow: auto;
@@ -64,6 +70,7 @@ body {
 #score-form {
   text-align: center;
   margin-top: 1rem;
+  margin-bottom: 1rem;
 }
 
 #identifier {
@@ -154,6 +161,9 @@ select {
   border: solid 1px black;
   border-radius: 4px;
   margin: 2px;
+  &:hover {
+    filter: invert(1)
+  }
 }
 
 #buttons {
